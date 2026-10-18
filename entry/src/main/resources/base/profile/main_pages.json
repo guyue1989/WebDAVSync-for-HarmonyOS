@@ -1,0 +1,12 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/ConnectionListPage",
+    "pages/ConnectionEditPage",
+    "pages/FileBrowserPage",
+    "pages/SyncSettingsPage",
+    "pages/SyncStatusPage",
+    "pages/LocalDirPickerPage",
+    "pages/TrayPanelPage"
+  ]
+}
