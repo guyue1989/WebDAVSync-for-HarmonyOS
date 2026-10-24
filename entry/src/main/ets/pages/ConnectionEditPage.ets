@@ -158,6 +158,7 @@ struct ConnectionEditPage {
         .padding(16)
       }
       .layoutWeight(1)
+      .align(Alignment.Top)
 
       Row() {
         Button('测试连接').layoutWeight(1).margin({ left: 16, right: 8, bottom: 16 }).opacity(this.hovBtn === 'test' ? 0.85 : 1)

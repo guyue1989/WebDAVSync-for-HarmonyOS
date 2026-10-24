@@ -211,11 +211,22 @@ struct FileBrowserPage {
       .layoutWeight(1)
 
       if (this.isSelectMode) {
-        Button('选择当前目录：' + this.currentPath).width('90%').margin({ bottom: 16 }).opacity(this.hovBtn === 'select' ? 0.85 : 1)
-          .onHover((h: boolean) => { this.hovBtn = h ? 'select' : ''; })
-          .onClick(() => {
-          this.selectRemoteDir();
-        })
+        Column() {
+          // The path used to be baked into the button label, where a Button never wraps: a narrow
+          // window cut it off mid-string, right on the control that tells you what you are picking.
+          Text('当前目录：' + this.currentPath)
+            .fontSize(13)
+            .fontColor(Theme.sub(this.isDark()))
+            .width('100%')
+            .margin({ bottom: 6 })
+          Button('选择当前目录').width('100%').opacity(this.hovBtn === 'select' ? 0.85 : 1)
+            .onHover((h: boolean) => { this.hovBtn = h ? 'select' : ''; })
+            .onClick(() => {
+            this.selectRemoteDir();
+          })
+        }
+        .width('90%')
+        .margin({ bottom: 16 })
       }
     }
     .width('100%')

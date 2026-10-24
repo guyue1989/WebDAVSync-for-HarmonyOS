@@ -190,11 +190,9 @@ export class SyncEngine implements ISyncEngine {
 
     await this.webDavClient.resolveAddress(conn);
 
-    let localDir = task.localDir;
-    if (localDir.startsWith('file://')) {
-      const slash = localDir.indexOf('/', 7);
-      localDir = slash < 0 ? '/' : localDir.substring(slash);
-    }
+    // Same URI→path rule as everywhere else: strip file://docs and percent-decode, or a
+    // Chinese-named folder is looked up by its encoded spelling and reads as missing.
+    let localDir: string = this.localFileService.toPath(task.localDir);
     if (!localDir.startsWith('/')) {
       const ctx = AppContext.getContext();
       if (ctx !== null) {

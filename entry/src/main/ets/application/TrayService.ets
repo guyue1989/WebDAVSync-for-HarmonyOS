@@ -40,7 +40,7 @@ export class TrayService implements ITrayService {
         content: {
           notificationContentType: notification.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
           normal: {
-            title: 'WebDAV 同步',
+            title: '年槌糕同步',
             text: '应用正在后台运行，点击恢复',
             additionalText: ''
           }

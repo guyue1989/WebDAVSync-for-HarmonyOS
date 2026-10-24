@@ -1,4 +1,4 @@
-# WebDAV 同步
+# 年槌糕同步
 
 HarmonyOS NEXT（SDK 6.1.0(23) / API 23）上的 WebDAV 文件同步工具，面向 Synology NAS 等 WebDAV 服务器，在本地目录与远程目录之间做双向或单向同步。在 PC/2in1 上它以状态栏托盘常驻，窗口关掉之后同步、监听和轮询照常运行。
 
@@ -18,7 +18,8 @@ HarmonyOS NEXT（SDK 6.1.0(23) / API 23）上的 WebDAV 文件同步工具，面
 - **状态栏托盘（PC/2in1）** — 托盘图标、关闭按钮改为隐藏窗口、单击图标恢复主窗口、右键菜单
 - **后台保活** — 长时任务（计算任务优先，数据传输兜底），窗口隐藏后同步不休眠
 - **主题** — 浅色 / 深色 / 跟随系统，默认为跟随系统；用户手动选择后记住，启动窗口底色随明暗模式切换
-- **桌面交互** — 响应式栅格布局，鼠标悬停高亮
+- **目录授权** — 「本地目录」页有文档/下载/桌面/图片/视频/音乐六个快捷入口，点击直接拉起系统文件管理的授权界面，也可以浏览自选目录；本机会记住上一次选过的本地目录与远程目录，新任务表单只预填这个记忆，新用户进来是「未选择」状态，不会看到一个替他们选好的文件夹
+- **桌面交互** — 布局跟随窗口宽度自适应（PC 自由窗口可任意缩放）：表单项贴顶排列、按钮条放不下就折行、长路径独占一行完整显示，鼠标悬停高亮
 
 ## 技术栈
 
@@ -111,14 +112,14 @@ entry/src/main/ets/
 - 托盘图标由 `StatusBarService.add()` 通过 `statusBarManager.addToStatusBar()` 添加，图标必须解码成 24vp×24vp PixelMap，`quickOperation.height` 必须大于 0。
 - **左键链路**：本设备从不投递 `statusBarIconClick` 事件，所以左键走 QuickOperation 面板 —— `TrayPanelAbility`（`StatusBarViewExtensionAbility`，独立进程）在 `onForeground` / 页面 `onPageShow` 时 `startAbility(EntryAbility)`，singleton 被重新拉起即恢复窗口。面板会话**不主动 `terminateSelf()`**：宿主会在约 100 ms 后重开一个会话，那张空面板会盖在刚恢复的窗口上，表现为「要点两次」。
 - 窗口隐藏后进程会被挂起，所以 `onBackground` 申请长时任务（`taskKeeping` 优先，失败退到 `dataTransfer`；`9800005` 视为已持有），`onForeground` 释放；对应 module.json5 的 `backgroundModes` 与 `KEEP_BACKGROUND_RUNNING` 缺一不可。
-- 手机/平板没有这些桌面能力：`hideAbility()` 返回 801，`addToStatusBar` 抛错，代码按失败回退到最小化，核心的文件同步不受影响。
+- 手机/平板没有这些桌面能力：`hideAbility()` 返回 801，`addToStatusBar` 抛错，代码按失败回退到最小化。因为核心常驻形态在手机上不成立、也没有真机验证过，`module.json5` 的 `deviceTypes` 只声明 `2in1`，手机上根本装不到；将来要覆盖手机，先用远程真机跑一遍再放开设备范围（AGC 后台的「支持设备」勾选必须同步改，Profile 也要重新生成）。
 
 ## 构建与运行
 
 1. 复制签名模板：`cp build-profile.json5.template build-profile.json5`
 2. 把 `build-profile.json5` 中的占位值替换为实际签名证书路径与密码（该文件已在 `.gitignore` 中，绝不提交）
 3. 用 DevEco Studio 5.0+ 打开项目根目录，等待 hvigor 同步依赖
-4. 选择目标设备（PC/2in1 体验最完整，phone/tablet 亦可），点击 Run
+4. 选择目标设备（只声明了 `2in1`，即 PC/2in1 真机或对应模拟器），点击 Run
 5. 首次使用需在「本地目录」页重新选择同步目录并授权——授权是持久化的，但**重新构建/重装会清空**，必须重选
 
 ## 权限
@@ -132,10 +133,19 @@ entry/src/main/ets/
 
 目录授权通过 `DocumentViewPicker`（FOLDER 模式）取得，读写模式必须一起传 `READ_MODE | WRITE_MODE`（`WRITE_MODE` 不含读权限），并且在 `onSessionCreate` 当场持久化；每次启动都要 `activatePermission`，之后才能碰该目录。
 
+选择器返回的是 `file://docs/storage/...` 形式的 URI，本项目的规则是**去掉 `file://docs` 前缀，再做一次 `decodeURIComponent`**，之后只按普通路径用 `fs`。漏了解码这一步，中文目录名会以 `%E7%A4%BA%E4%BE%8B...` 的编码拼写被拿去查找，`fs` 报 `No such file or directory`，症状和"授权丢了"完全一样、极难猜。这条转换只有一处实现——`LocalFileService.toPath()`（`ILocalFileService` 的接口方法），同步引擎取任务里的本地目录也走它，不允许再有第二处手写的前缀裁剪。
+
 ## 兼容性与已知平台行为
 
-- 编译 SDK / 最低版本：6.1.0(23)，即 API 23；运行环境 HarmonyOS NEXT；设备类型 phone / tablet / 2in1
+- 编译 SDK / 最低版本：6.1.0(23)，即 API 23；运行环境 HarmonyOS NEXT；设备类型仅 `2in1`（须与 AGC 后台「支持设备」一致）
 - 托盘、`hideAbility`/`showAbility`（PC/2in1 13+）、`TASK_KEEPING`（PC/2in1 API 20/21 起对三方开放）只在桌面形态可用
 - 本 SDK 中不存在或无效的东西，不要指望它们：`statusBarManager.isStatusBarCapabilitySupported`（API 26）、`backgroundTaskManager.on('continuousTaskCancel')`、`Window.setWindowCloseInterceptor`、`Window.setWindowIcon`、module.json5 的 `excludeFromDock`（官方标注「该标签配置不生效」）
-- 图标用分层图标（`$media:layered_image`：前景 = 透明 glyph `foreground.png`，背景 = 纯色 `background.png`），`AppScope/app.json5` 与 `module.json5` 的 `abilities[].icon` 都指向它。背景层取的是窗口标题栏的灰 `#333333`（不是白色）：标题栏会把 Ability 图标原样画出来，白色底会在深色标题栏上变成一块白方块。桌面/启动器由系统自己加圆角和底板，灰色底不影响。没有按窗口设置图标的接口，所以只能这样统一。
+- 图标用分层图标（`$media:layered_image`：前景 = 透明 glyph `foreground.png`，背景 = 纯色 `background.png`），`AppScope/app.json5` 与 `module.json5` 的 `abilities[].icon` 都指向它。两层均为 **1024×1024 PNG**，背景层是纯白且不含任何透明像素，前景图形只占画幅中心约 70%——这三条是应用市场「应用图标」的上架检查项，尺寸不对或背景留透明会直接被卡。窗口标题栏会把 Ability 图标原样画出来，所以深色标题栏上会有一块白底，这是同一份资源无法拆开的既有限制（本 SDK 没有按窗口设置图标的接口）。
+- `store/app_icon_1024_flat.png`（33 KB，1024×1024，整张不透明）= 前景叠在纯白背景上的合成单图，只给 AGC 后台「应用图标」上传框用，不参与打包；Hap 里预置的仍是上面那两层分层资源。
+- PC 的 `DocumentViewPicker` 会记住用户上次导航到的位置并优先用它，所以 `defaultFilePathUri`（API 10+）拿来做定位并不可靠。要"一键授权某个固定目录"得同时把 `authMode`（API 12+）置 true——拉起的是文件管理的授权界面而不是常规选择器，且官方`设备行为差异`明写**仅 2in1 生效**，此时 `defaultFilePathUri` 变必填、含义转为"待授权 URI"。`multiAuthMode` / `multiUriArray`（API 15+）是 Phone-only 且只支持文件，文件夹上不生效
+- 快捷入口的目录名要按本机实际拼写取：`/storage/Users/currentUser/` 下是 `Desktop`、`Documents`、**`Download`（单数）**、**`Images`（不是 `Pictures`）**、`Music`、`Videos`。写成 `Downloads`/`Pictures` 得到的是「找不到或无法打开此路径」，那是路径不存在，不是授权被拒
 - `menuCode` 需要 API 24+，右键菜单项只能按 `title` 识别；系统自带且无法抑制的「退出」项会出现在托盘右键菜单里
+
+## 许可
+
+[MIT](LICENSE) — Copyright (c) 2026 niangao。可自由使用、修改、再分发与商用，分发时保留版权声明与许可声明即可。

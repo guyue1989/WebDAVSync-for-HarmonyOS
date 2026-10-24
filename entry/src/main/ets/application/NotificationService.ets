@@ -35,11 +35,11 @@ export class NotificationService implements INotificationService {
       if (result.message === '无变化') {
         return;
       }
-      await this.notify('WebDAV 同步完成', result.message);
+      await this.notify('年槌糕同步完成', result.message);
     } else if (result.status === SyncStatus.Error) {
-      await this.notify('WebDAV 同步失败', result.message);
+      await this.notify('年槌糕同步失败', result.message);
     } else if (result.conflicts.length > 0) {
-      await this.notify('WebDAV 同步冲突', '检测到 ' + result.conflicts.length.toString() + ' 个冲突');
+      await this.notify('年槌糕同步冲突', '检测到 ' + result.conflicts.length.toString() + ' 个冲突');
     }
   }
 }

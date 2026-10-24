@@ -4,9 +4,9 @@
     "type": "entry",
     "description": "$string:module_desc",
     "mainElement": "EntryAbility",
+    // Only 2in1 is declared: the whole residency design depends on the status-bar tray, which exists
+    // just on PC/2in1, and no other device type has ever been tested on real hardware.
     "deviceTypes": [
-      "phone",
-      "tablet",
       "2in1"
     ],
     "deliveryWithInstall": true,
@@ -17,8 +17,9 @@
         "name": "EntryAbility",
         "srcEntry": "./ets/entryability/EntryAbility.ets",
         "description": "$string:entryability_desc",
-        // Layered icon, and its background layer is the window chrome grey (#333333) rather than white:
-        // the title bar paints this icon unmasked, so a white card would sit on dark chrome.
+        // Layered icon: both layers are 1024x1024 with an opaque white background, which is what the
+        // app-market check requires. The title bar paints this icon unmasked, so it reads as a white
+        // card on dark chrome - this SDK has no per-window icon API to split desktop from title bar.
         "icon": "$media:layered_image",
         "label": "$string:app_name",
         "startWindowIcon": "$media:app_icon",

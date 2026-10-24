@@ -58,34 +58,35 @@ struct ConnectionListPage {
       List() {
         ForEach(this.connections, (conn: Connection) => {
           ListItem() {
-            Row() {
-              Column() {
-                Text(conn.name !== '' ? conn.name : conn.baseUrl).fontSize(16).fontColor(Theme.fg(this.isDark()))
-                Text(conn.username + ' @ ' + conn.rootPath).fontSize(12).fontColor(Theme.sub(this.isDark()))
+            Column() {
+              Row() {
+                Text(conn.name !== '' ? conn.name : conn.baseUrl).fontSize(16).fontColor(Theme.fg(this.isDark())).layoutWeight(1)
+                if (conn.id === this.activeId) {
+                  Text('当前').fontSize(12).fontColor(Theme.primary(this.isDark())).margin({ left: 8 })
+                }
               }
-              .alignItems(HorizontalAlign.Start)
-              .layoutWeight(1)
-
-              if (conn.id === this.activeId) {
-                Text('当前').fontSize(12).fontColor(Theme.primary(this.isDark())).margin({ right: 8 })
+              .width('100%')
+              Text(conn.username + ' @ ' + conn.rootPath).fontSize(12).fontColor(Theme.sub(this.isDark())).width('100%').margin({ top: 2 })
+              Flex({ wrap: FlexWrap.Wrap }) {
+                Button('编辑').fontSize(12).height(32).margin({ top: 8, right: 8 }).opacity(this.hovBtn === 'edit-' + conn.id ? 0.85 : 1)
+                  .onHover((h: boolean) => { this.hovBtn = h ? 'edit-' + conn.id : ''; })
+                  .onClick(() => {
+                  AppStorage.setOrCreate('editingConnId', conn.id);
+                  router.pushUrl({ url: 'pages/ConnectionEditPage', params: { id: conn.id } });
+                })
+                Button('设为当前').fontSize(12).height(32).margin({ top: 8, right: 8 }).opacity(this.hovBtn === 'active-' + conn.id ? 0.85 : 1)
+                  .onHover((h: boolean) => { this.hovBtn = h ? 'active-' + conn.id : ''; })
+                  .onClick(() => {
+                  this.setActive(conn.id);
+                })
+                Button('删除').fontSize(12).height(32).margin({ top: 8, right: 8 }).opacity(this.hovBtn === 'del-' + conn.id ? 0.85 : 1)
+                  .onHover((h: boolean) => { this.hovBtn = h ? 'del-' + conn.id : ''; })
+                  .onClick(() => {
+                  this.remove(conn.id);
+                })
               }
-              Button('编辑').fontSize(12).height(32).opacity(this.hovBtn === 'edit-' + conn.id ? 0.85 : 1)
-                .onHover((h: boolean) => { this.hovBtn = h ? 'edit-' + conn.id : ''; })
-                .onClick(() => {
-                AppStorage.setOrCreate('editingConnId', conn.id);
-                router.pushUrl({ url: 'pages/ConnectionEditPage', params: { id: conn.id } });
-              })
-              Button('设为当前').fontSize(12).height(32).margin({ left: 8 }).opacity(this.hovBtn === 'active-' + conn.id ? 0.85 : 1)
-                .onHover((h: boolean) => { this.hovBtn = h ? 'active-' + conn.id : ''; })
-                .onClick(() => {
-                this.setActive(conn.id);
-              })
-              Button('删除').fontSize(12).height(32).margin({ left: 8 }).opacity(this.hovBtn === 'del-' + conn.id ? 0.85 : 1)
-                .onHover((h: boolean) => { this.hovBtn = h ? 'del-' + conn.id : ''; })
-                .onClick(() => {
-                this.remove(conn.id);
-              })
             }
+            .alignItems(HorizontalAlign.Start)
             .width('100%')
             .padding(12)
             .backgroundColor(this.hovRow === conn.id ? Theme.cardHover(this.isDark()) : Color.Transparent)

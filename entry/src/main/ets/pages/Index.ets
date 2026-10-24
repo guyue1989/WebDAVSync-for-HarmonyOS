@@ -24,7 +24,7 @@ struct Index {
   build() {
     Column() {
       Row() {
-        Text('WebDAV 同步').fontSize(26).fontWeight(FontWeight.Bold).fontColor(Theme.fg(this.isDark()))
+        Text('年槌糕同步').fontSize(26).fontWeight(FontWeight.Bold).fontColor(Theme.fg(this.isDark()))
         Blank()
         this.themeChip('跟随系统', 'system')
         this.themeChip('浅色', 'light')

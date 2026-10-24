@@ -17,6 +17,7 @@ export interface ILocalFileService {
   removePath(path: string): Promise<Result<boolean>>;
   listDirectory(dir: string): Promise<Result<FileEntry[]>>;
 
+  toPath(path: string): string;
   joinPath(...parts: string[]): string;
 }
 
@@ -33,7 +34,15 @@ export class LocalFileService implements ILocalFileService {
     if (slash < 0) {
       return '/';
     }
-    return rest.substring(slash);
+    // The URI path is percent-encoded by the picker, so a Chinese folder name arrives as
+    // %E7%A4%BA... and fs reports "No such file or directory" for a folder that does exist.
+    const plain = rest.substring(slash);
+    try {
+      return decodeURIComponent(plain);
+    } catch (e) {
+      // A stray malformed % sequence: the string is already the literal name.
+      return plain;
+    }
   }
 
   joinPath(...parts: string[]): string {

@@ -34,7 +34,7 @@ export class StatusBarService {
       const operation: statusBarManager.QuickOperation = {
         abilityName: 'TrayPanelAbility',
         moduleName: 'entry',
-        title: 'WebDAV 同步',
+        title: '年槌糕同步',
         height: 1
       };
       const openAction: statusBarManager.StatusBarMenuAction = {
@@ -50,7 +50,7 @@ export class StatusBarService {
         icons: icons,
         quickOperation: operation,
         statusBarGroupMenu: [group],
-        hoverTips: 'WebDAV 同步'
+        hoverTips: '年槌糕同步'
       };
       statusBarManager.addToStatusBar(ctx, item);
       // Kept only as a second channel and as evidence: this event needs an empty quickOperation

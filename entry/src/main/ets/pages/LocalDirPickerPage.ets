@@ -26,9 +26,11 @@ struct LocalDirPickerPage {
 
   private quickAccessList: QuickAccess[] = [
     { label: '文档', path: USER_ROOT + '/Documents' },
-    { label: '下载', path: USER_ROOT + '/Downloads' },
+    // Device names, not the Android/mac habit: this PC has Download (singular) and Images, so
+    // Downloads/Pictures made those two buttons fail with 找不到或无法打开此路径.
+    { label: '下载', path: USER_ROOT + '/Download' },
     { label: '桌面', path: USER_ROOT + '/Desktop' },
-    { label: '图片', path: USER_ROOT + '/Pictures' },
+    { label: '图片', path: USER_ROOT + '/Images' },
     { label: '视频', path: USER_ROOT + '/Videos' },
     { label: '音乐', path: USER_ROOT + '/Music' },
   ];
@@ -69,7 +71,8 @@ struct LocalDirPickerPage {
     }
   }
 
-  private openFolderPicker(): void {
+  // startUri is the folder the quick-access row asked for, or '' for the plain browse flow.
+  private openFolderPicker(startUri: string): void {
     try {
       const context: common.UIAbilityContext | null = AppContext.getContext();
       if (context === null) {
@@ -79,6 +82,14 @@ struct LocalDirPickerPage {
 
       const options: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
       options.selectMode = picker.DocumentSelectMode.FOLDER;
+      if (startUri !== '') {
+        // Quick access has to ask the system for a grant on that exact folder. A plain
+        // defaultFilePathUri would only move the picker's start location, which 2in1 overrides
+        // with its remembered position; authMode opens the file-manager grant sheet instead and
+        // is documented as working on 2in1 (API 12+).
+        options.defaultFilePathUri = startUri;
+        options.authMode = true;
+      }
 
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(context);
       docPicker.select(options, async (err: Error, filePaths: Array<string>) => {
@@ -100,12 +111,18 @@ struct LocalDirPickerPage {
     }
   }
 
-  selectFromQuickAccess(_path: string): void {
-    this.openFolderPicker();
+  selectFromQuickAccess(path: string): void {
+    this.openFolderPicker('file://docs' + path);
   }
 
   selectCustomDir(): void {
-    this.openFolderPicker();
+    this.openFolderPicker('');
+  }
+
+  // The URI form is percent-encoded and carries the file://docs prefix, which reads as noise to
+  // a user; show the plain path fs actually works with.
+  private displayPath(): string {
+    return ServiceContainer.localFileService.toPath(this.selectedPath);
   }
 
   async confirmSelection(): Promise<void> {
@@ -118,6 +135,10 @@ struct LocalDirPickerPage {
     await SettingsStore.put('selectedLocalDir', this.selectedPath);
     AppStorage.setOrCreate('selectedLocalDir', this.selectedPath);
     AppStorage.setOrCreate('localDirUnusable', false);
+    // Handed to the task form as a one-shot so it lands even when that form already held a
+    // different folder; 'selectedLocalDir' above stays as the device's memory used to prefill an
+    // empty new-task form.
+    AppStorage.setOrCreate('pendingLocalDir', this.selectedPath);
 
     // Reinstalling clears the folder grant, so the watchers started at launch are dead in the
     // water. Restart them now that the permission is live, otherwise local changes only
@@ -139,6 +160,8 @@ struct LocalDirPickerPage {
       .padding(16)
       .alignItems(VerticalAlign.Center)
 
+      Scroll() {
+        Column() {
       if (this.permWarning !== '') {
         Text(this.permWarning)
           .fontSize(13)
@@ -184,7 +207,7 @@ struct LocalDirPickerPage {
       if (this.selectedPath !== '') {
         Column() {
           Text('已选择：').fontSize(13).fontColor(Theme.sub(this.isDark())).width('100%')
-          Text(this.selectedPath)
+          Text(this.displayPath())
             .fontSize(14)
             .fontColor(Theme.fg(this.isDark()))
             .width('100%')
@@ -197,8 +220,12 @@ struct LocalDirPickerPage {
         .alignItems(HorizontalAlign.Start)
         .margin({ bottom: 16 })
       }
-
-      Blank()
+        }
+        .width('100%')
+      }
+      .layoutWeight(1)
+      .align(Alignment.Top)
+      .width('100%')
 
       Button('确认选择')
         .fontSize(16)

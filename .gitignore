@@ -16,3 +16,5 @@
 .DS_Store
 Thumbs.db
 agconnect-services.json
+/.bitfun/
+/store/source_listing_V1.0.html

@@ -1,7 +1,6 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import { ServiceContainer } from '../application/ServiceContainer';
-import { AppContext } from '../application/AppContext';
 import { SyncTask } from '../domain/SyncTask';
 import { SyncDirection } from '../domain/Enums';
 import { ConflictStrategy } from '../domain/Enums';
@@ -35,11 +34,13 @@ struct SyncSettingsPage {
 
   async aboutToAppear(): Promise<void> {
     await ServiceContainer.init();
-    const ctx = AppContext.getContext();
-    if (ctx !== null) {
-      this.localDir = '/storage/Users/currentUser/Documents';
-    }
     await this.load();
+  }
+
+  // The folder this device picked last, '' for a user who has never picked one.
+  private rememberedLocalDir(): string {
+    const d = AppStorage.get<string>('selectedLocalDir');
+    return d !== undefined ? d : '';
   }
 
   onPageShow(): void {
@@ -47,14 +48,29 @@ struct SyncSettingsPage {
     if (d !== undefined && d !== '') {
       this.remoteDir = d;
     }
-    const ld = AppStorage.get<string>('selectedLocalDir');
-    if (ld !== undefined && ld !== '') {
-      this.localDir = ld;
+    // The folder just confirmed on the picker page wins outright: it has to land even in a form
+    // that already held a different folder, so it is handed over once and then cleared.
+    const pending = AppStorage.get<string>('pendingLocalDir');
+    if (pending !== undefined && pending !== '') {
+      this.localDir = pending;
+      AppStorage.setOrCreate('pendingLocalDir', '');
+      return;
+    }
+    // Otherwise offer the remembered folder, but only into an empty new-task form — an edit in
+    // progress must keep the folder the task itself was saved with.
+    if (this.localDir === '' && this.editingTaskId === '') {
+      this.localDir = this.rememberedLocalDir();
     }
   }
 
   selectLocalDir(): void {
     router.pushUrl({ url: 'pages/LocalDirPickerPage' });
+  }
+
+  // Pickers return file://docs URIs whose non-ASCII names are percent-encoded; show the decoded
+  // plain path instead, which is what fs actually uses and what a user can read.
+  private showDir(dir: string): string {
+    return ServiceContainer.localFileService.toPath(dir);
   }
 
   async load(): Promise<void> {
@@ -132,7 +148,7 @@ struct SyncSettingsPage {
   resetForm(): void {
     this.editingTaskId = '';
     this.remoteDir = '';
-    this.localDir = '/storage/Users/currentUser/Documents';
+    this.localDir = this.rememberedLocalDir();
     this.syncDirection = SyncDirection.Bidirectional;
     this.conflictStrategy = ConflictStrategy.CreateCopy;
     this.watchEnabled = true;
@@ -182,39 +198,34 @@ struct SyncSettingsPage {
       .padding(16)
       .alignItems(VerticalAlign.Center)
 
-      List() {
-        ForEach(this.tasks, (task: SyncTask) => {
-          ListItem() {
+      Scroll() {
+        Column() {
+          ForEach(this.tasks, (task: SyncTask) => {
             Column() {
-              Text(this.directionLabel(task.direction) + '：' + task.localDir + ' ↔ ' + task.remoteDir).fontSize(14).fontColor(Theme.fg(this.isDark())).width('100%')
-              Row() {
-                Button('编辑').fontSize(12).height(32).opacity(this.hovBtn === 'edit-' + task.id ? 0.85 : 1)
+              Text(this.directionLabel(task.direction) + '：' + this.showDir(task.localDir) + ' ↔ ' + task.remoteDir).fontSize(14).fontColor(Theme.fg(this.isDark())).width('100%')
+              Flex({ wrap: FlexWrap.Wrap }) {
+                Button('编辑').fontSize(12).height(32).margin({ top: 8, right: 8 }).opacity(this.hovBtn === 'edit-' + task.id ? 0.85 : 1)
                   .onHover((h: boolean) => { this.hovBtn = h ? 'edit-' + task.id : ''; })
                   .onClick(() => { this.startEdit(task); })
-                Button('同步').fontSize(12).height(32).margin({ left: 8 }).opacity(this.hovBtn === 'sync-' + task.id ? 0.85 : 1)
+                Button('同步').fontSize(12).height(32).margin({ top: 8, right: 8 }).opacity(this.hovBtn === 'sync-' + task.id ? 0.85 : 1)
                   .onHover((h: boolean) => { this.hovBtn = h ? 'sync-' + task.id : ''; })
                   .onClick(() => { this.runSync(task); })
-                Button('启动').fontSize(12).height(32).margin({ left: 8 }).opacity(this.hovBtn === 'start-' + task.id ? 0.85 : 1)
+                Button('启动').fontSize(12).height(32).margin({ top: 8, right: 8 }).opacity(this.hovBtn === 'start-' + task.id ? 0.85 : 1)
                   .onHover((h: boolean) => { this.hovBtn = h ? 'start-' + task.id : ''; })
                   .onClick(() => { this.startTask(task); })
-                Button('删除').fontSize(12).height(32).margin({ left: 8 }).opacity(this.hovBtn === 'del-' + task.id ? 0.85 : 1)
+                Button('删除').fontSize(12).height(32).margin({ top: 8, right: 8 }).opacity(this.hovBtn === 'del-' + task.id ? 0.85 : 1)
                   .onHover((h: boolean) => { this.hovBtn = h ? 'del-' + task.id : ''; })
                   .onClick(() => { this.deleteTask(task.id); })
               }
-              .margin({ top: 8 })
             }
             .alignItems(HorizontalAlign.Start)
             .width('100%')
             .padding(12)
             .backgroundColor(this.hovRow === task.id ? Theme.cardHover(this.isDark()) : Color.Transparent)
             .onHover((h: boolean) => { this.hovRow = h ? task.id : ''; })
-          }
-        }, (task: SyncTask) => task.id)
-      }
-      .layoutWeight(1)
+          }, (task: SyncTask) => task.id)
 
       if (this.showForm) {
-        Scroll() {
           Column() {
             Row() {
               Text(this.remoteDir === '' ? '远程目录：未选择' : '远程目录：' + this.remoteDir)
@@ -228,10 +239,10 @@ struct SyncSettingsPage {
             })
           }
           .width('100%')
-          .height(40)
+          .constraintSize({ minHeight: 40 })
           .margin({ bottom: 8 })
           Row() {
-            Text(this.localDir === '' ? '本地目录：未选择' : '本地目录：' + this.localDir)
+            Text(this.localDir === '' ? '本地目录：未选择' : '本地目录：' + this.showDir(this.localDir))
               .fontSize(14)
               .fontColor(this.localDir === '' ? Theme.sub(this.isDark()) : Theme.fg(this.isDark()))
               .layoutWeight(1)
@@ -242,7 +253,7 @@ struct SyncSettingsPage {
             })
           }
           .width('100%')
-          .height(40)
+          .constraintSize({ minHeight: 40 })
           .margin({ bottom: 8 })
           Row() {
             Text('方向：' + this.directionLabel(this.syncDirection)).fontSize(14).fontColor(Theme.fg(this.isDark())).layoutWeight(1)
@@ -343,11 +354,14 @@ struct SyncSettingsPage {
           }
           .width('100%')
           .padding(16)
+          }
         }
-        .layoutWeight(1)
         .width('100%')
-        .scrollBar(BarState.Auto)
       }
+      .layoutWeight(1)
+      .align(Alignment.Top)
+      .width('100%')
+      .scrollBar(BarState.Auto)
 
       Button(this.showForm ? '收起' : '新增同步任务').width('90%').margin({ bottom: 16 }).opacity(this.hovBtn === 'toggle-form' ? 0.85 : 1)
         .onHover((h: boolean) => { this.hovBtn = h ? 'toggle-form' : ''; })
