@@ -2,6 +2,8 @@
 
 HarmonyOS NEXT（SDK 6.1.0(23) / API 23）上的 WebDAV 文件同步工具，面向 Synology NAS 等 WebDAV 服务器，在本地目录与远程目录之间做双向或单向同步。在 PC/2in1 上它以状态栏托盘常驻，窗口关掉之后同步、监听和轮询照常运行。
 
+**设备支持：只做 HarmonyOS PC / 2in1。** 直接原因是**开发者手上没有鸿蒙手机和平板**，这两种形态一行代码都没在真机上跑过，所以不去声明一个自己无法验证的适用范围（`module.json5` 的 `deviceTypes` 因此只写 `2in1`，手机上安装不到）。需要说清的是：手机侧缺的主要是**验证机会**，而不是被刻意砍掉的功能分支——代码里对 `hideAbility()` 返回 801、`addToStatusBar` 抛错都做了失败回退；但常驻这套核心能力（状态栏托盘、窗口隐藏后继续同步、长时任务保活）本身依赖桌面形态，手机上即使装上了也复现不出「窗口关掉后照常同步」这句承诺，与其让用户搜到后踩坑，不如先不声明。将来若有真机或远程真机跑通，再放开设备范围。
+
 ## 功能特性
 
 - **连接管理** — 可配置多个 WebDAV 服务器，LAN/WAN 双地址自动探测，凭证以 AES-256-CBC 加密存储
@@ -112,7 +114,7 @@ entry/src/main/ets/
 - 托盘图标由 `StatusBarService.add()` 通过 `statusBarManager.addToStatusBar()` 添加，图标必须解码成 24vp×24vp PixelMap，`quickOperation.height` 必须大于 0。
 - **左键链路**：本设备从不投递 `statusBarIconClick` 事件，所以左键走 QuickOperation 面板 —— `TrayPanelAbility`（`StatusBarViewExtensionAbility`，独立进程）在 `onForeground` / 页面 `onPageShow` 时 `startAbility(EntryAbility)`，singleton 被重新拉起即恢复窗口。面板会话**不主动 `terminateSelf()`**：宿主会在约 100 ms 后重开一个会话，那张空面板会盖在刚恢复的窗口上，表现为「要点两次」。
 - 窗口隐藏后进程会被挂起，所以 `onBackground` 申请长时任务（`taskKeeping` 优先，失败退到 `dataTransfer`；`9800005` 视为已持有），`onForeground` 释放；对应 module.json5 的 `backgroundModes` 与 `KEEP_BACKGROUND_RUNNING` 缺一不可。
-- 手机/平板没有这些桌面能力：`hideAbility()` 返回 801，`addToStatusBar` 抛错，代码按失败回退到最小化。因为核心常驻形态在手机上不成立、也没有真机验证过，`module.json5` 的 `deviceTypes` 只声明 `2in1`，手机上根本装不到；将来要覆盖手机，先用远程真机跑一遍再放开设备范围（AGC 后台的「支持设备」勾选必须同步改，Profile 也要重新生成）。
+- 手机/平板没有这些桌面能力：`hideAbility()` 返回 801，`addToStatusBar` 抛错，代码按失败回退到最小化。因为核心常驻形态在手机上不成立、且开发者没有鸿蒙手机/平板可以做真机验证（详见开头「设备支持」），`module.json5` 的 `deviceTypes` 只声明 `2in1`，手机上根本装不到；将来要覆盖手机，先用真机或远程真机跑一遍再放开设备范围（AGC 后台的「支持设备」勾选必须同步改，Profile 也要重新生成）。
 
 ## 构建与运行
 
@@ -137,7 +139,7 @@ entry/src/main/ets/
 
 ## 兼容性与已知平台行为
 
-- 编译 SDK / 最低版本：6.1.0(23)，即 API 23；运行环境 HarmonyOS NEXT；设备类型仅 `2in1`（须与 AGC 后台「支持设备」一致）
+- 编译 SDK / 最低版本：6.1.0(23)，即 API 23；运行环境 HarmonyOS NEXT；设备类型仅 `2in1`（须与 AGC 后台「支持设备」一致）。这是**未实测所以不声明**，不是手机端适配被砍掉，理由见开头「设备支持」
 - 托盘、`hideAbility`/`showAbility`（PC/2in1 13+）、`TASK_KEEPING`（PC/2in1 API 20/21 起对三方开放）只在桌面形态可用
 - 本 SDK 中不存在或无效的东西，不要指望它们：`statusBarManager.isStatusBarCapabilitySupported`（API 26）、`backgroundTaskManager.on('continuousTaskCancel')`、`Window.setWindowCloseInterceptor`、`Window.setWindowIcon`、module.json5 的 `excludeFromDock`（官方标注「该标签配置不生效」）
 - 图标用分层图标（`$media:layered_image`：前景 = 透明 glyph `foreground.png`，背景 = 纯色 `background.png`），`AppScope/app.json5` 与 `module.json5` 的 `abilities[].icon` 都指向它。两层均为 **1024×1024 PNG**，背景层是纯白且不含任何透明像素，前景图形只占画幅中心约 70%——这三条是应用市场「应用图标」的上架检查项，尺寸不对或背景留透明会直接被卡。窗口标题栏会把 Ability 图标原样画出来，所以深色标题栏上会有一块白底，这是同一份资源无法拆开的既有限制（本 SDK 没有按窗口设置图标的接口）。
